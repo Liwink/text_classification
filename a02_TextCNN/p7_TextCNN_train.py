@@ -3,8 +3,8 @@
 # process--->1.load data(X:list of lint,y:int). 2.create session. 3.feed data. 4.training (5.validation) ,(6.prediction)
 import sys
 
-reload(sys)
-sys.setdefaultencoding('utf8')
+# reload(sys)
+# sys.setdefaultencoding('utf8')
 import tensorflow as tf
 import numpy as np
 from p7_TextCNN_model import TextCNN
@@ -14,11 +14,17 @@ import os
 import word2vec
 import pickle
 
+# fixme
+TEST = True
+
 # configuration
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+if not TEST:
+    tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+else:
+    tf.app.flags.DEFINE_integer("batch_size", 64, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 6000, "how many steps before decay learning rate.")  # 6000批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.65, "Rate of decay for learning rate.")  # 0.65一次衰减多少
 # tf.app.flags.DEFINE_integer("num_sampled",50,"number of noise sampling") #100
@@ -55,13 +61,19 @@ def main(_):
         vocab_size = len(vocabulary_word2index)
         print("cnn_model.vocab_size:", vocab_size)
         vocabulary_word2index_label, vocabulary_index2word_label = create_voabulary_label(name_scope="cnn2")
-        if FLAGS.multi_label_flag:
-            FLAGS.traning_data_path = 'training-data/train-zhihu6-title-desc.txt'  # test-zhihu5-only-title-multilabel.txt
+        # if FLAGS.multi_label_flag:
+        #     FLAGS.traning_data_path = 'training-data/train-zhihu6-title-desc.txt'
         train, test, _ = load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
                                                   multi_label_flag=FLAGS.multi_label_flag,
                                                   traning_data_path=FLAGS.traning_data_path)  # ,traning_data_path=FLAGS.traning_data_path
         trainX, trainY = train
         testX, testY = test
+
+        if TEST:
+            trainX = trainX[:10000]
+            trainY = trainY[:10000]
+            testX = testX[:100]
+            testY = testY[:100]
         # 2.Data preprocessing.Sequence padding
         print("start padding & transform to one hot...")
         trainX = pad_sequences(trainX, maxlen=FLAGS.sentence_len, value=0.)  # padding to max length
@@ -76,8 +88,8 @@ def main(_):
     config.gpu_options.allow_growth = True
     with tf.Session(config=config) as sess:
         # Instantiate Model
-        textCNN = TextCNN(filter_sizes, FLAGS.num_filters, FLAGS.num_classes, FLAGS.learning_rate, FLAGS.batch_size,
-                          FLAGS.decay_steps,
+        textCNN = TextCNN(filter_sizes, FLAGS.num_filters, FLAGS.num_classes,
+                          FLAGS.learning_rate, FLAGS.batch_size, FLAGS.decay_steps,
                           FLAGS.decay_rate, FLAGS.sentence_len, vocab_size, FLAGS.embed_size, FLAGS.is_training,
                           multi_label_flag=FLAGS.multi_label_flag)
         # Initialize Save
@@ -111,8 +123,7 @@ def main(_):
                 loss, counter, acc = loss + curr_loss, counter + 1, acc + curr_acc
                 if counter % 50 == 0:
                     print("Epoch %d\tBatch %d\tTrain Loss:%.3f\tTrain Accuracy:%.3f" % (
-                    epoch, counter, loss / float(counter),
-                    acc / float(counter)))  # tTrain Accuracy:%.3f---》acc/float(counter)
+                    epoch, counter, loss / float(counter), acc / float(counter)))
 
             # epoch increment
             print("going to increment epoch counter....")
@@ -142,7 +153,7 @@ def assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, te
     word_embedding_2dlist = [[]] * vocab_size  # create an empty word_embedding list.
     word_embedding_2dlist[0] = np.zeros(FLAGS.embed_size)  # assign empty for first word:'PAD'
     bound = np.sqrt(6.0) / np.sqrt(vocab_size)  # bound for random variables.
-    count_exist = 0;
+    count_exist = 0
     count_not_exist = 0
     for i in range(1, vocab_size):  # loop each word
         word = vocabulary_index2word[i]  # get a word
@@ -152,7 +163,7 @@ def assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, te
         except Exception:
             embedding = None
         if embedding is not None:  # the 'word' exist a embedding
-            word_embedding_2dlist[i] = embedding;
+            word_embedding_2dlist[i] = embedding
             count_exist = count_exist + 1  # assign array to this word.
         else:  # no embedding for this word
             word_embedding_2dlist[i] = np.random.uniform(-bound, bound, FLAGS.embed_size);
@@ -161,7 +172,7 @@ def assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, te
     word_embedding = tf.constant(word_embedding_final, dtype=tf.float32)  # convert to tensor
     t_assign_embedding = tf.assign(textCNN.Embedding,
                                    word_embedding)  # assign this value to our embedding variables of our model.
-    sess.run(t_assign_embedding);
+    sess.run(t_assign_embedding)
     print("word. exists embedding:", count_exist, " ;word not exist embedding:", count_not_exist)
     print("using pre-trained word emebedding.ended...")
 
