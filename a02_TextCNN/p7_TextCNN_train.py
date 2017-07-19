@@ -17,7 +17,7 @@ from evaluate import evaluate
 import pickle
 
 # fixme
-TEST = True
+TEST = False
 
 # configuration
 FLAGS = tf.app.flags.FLAGS
