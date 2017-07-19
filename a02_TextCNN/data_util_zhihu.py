@@ -8,6 +8,7 @@ import pickle
 
 PAD_ID = 0
 from tflearn.data_utils import pad_sequences
+from tqdm import tqdm
 
 _GO = "_GO"
 _END = "_END"
@@ -135,7 +136,8 @@ def create_voabulary_labelO():
 def load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label, valid_portion=0.05,
                              max_training_data=1000000,
                              traning_data_path='train-zhihu4-only-title-all.txt', multi_label_flag=True,
-                             use_seq2seq=False, seq2seq_label_length=6):  # n_words=100000,
+                             use_seq2seq=False, seq2seq_label_length=6,
+                             transform=True):  # n_words=100000,
     """
     input: a file path
     :return: train, test, valid. where train=(trainX, trainY). where
@@ -152,7 +154,7 @@ def load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
     X = []
     Y = []
     Y_decoder_input = []  # ADD 2017-06-15
-    for i, line in enumerate(lines):
+    for i, line in tqdm(enumerate(lines)):
         x, y = line.split('__label__')  # x='w17314 w5521 w7729 w767 w10147 w111'
         y = y.strip().replace('\n', '')
         x = x.strip()
@@ -194,7 +196,10 @@ def load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
                 for y in ys:
                     y_index = vocabulary_word2index_label[y]
                     ys_index.append(y_index)
-                ys_mulithot_list = transform_multilabel_as_multihot(ys_index)
+                if transform:
+                    ys_mulithot_list = transform_multilabel_as_multihot(ys_index)
+                else:
+                    ys_mulithot_list = ys_index
             else:  # 3)prepare single label format for classification
                 ys_mulithot_list = vocabulary_word2index_label[y]
         if i <= 3:
@@ -209,6 +214,8 @@ def load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
             #    break
     # 4.split to train,test and valid data
     number_examples = len(X)
+    X = np.array(X)
+    Y = np.array(Y)
     print("number_examples:", number_examples)  #
     train = (X[0:int((1 - valid_portion) * number_examples)], Y[0:int((1 - valid_portion) * number_examples)])
     test = (X[int((1 - valid_portion) * number_examples) + 1:], Y[int((1 - valid_portion) * number_examples) + 1:])

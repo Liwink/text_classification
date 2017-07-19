@@ -8,7 +8,8 @@ import sys
 import tensorflow as tf
 import numpy as np
 from p7_TextCNN_model import TextCNN
-from data_util_zhihu import load_data_multilabel_new, create_voabulary, create_voabulary_label
+from data_util_zhihu import load_data_multilabel_new, create_voabulary, \
+    create_voabulary_label, transform_multilabel_as_multihot
 from tflearn.data_utils import to_categorical, pad_sequences
 import os
 import word2vec
@@ -46,6 +47,21 @@ tf.app.flags.DEFINE_boolean("multi_label_flag", True, "use multi label or single
 filter_sizes = [1, 2, 3, 4, 5, 6, 7]  # [1,2,3,4,5,6,7]
 
 
+def make_batches(size, batch_size):
+    """Returns a list of batch indices (tuples of indices).
+
+    # Arguments
+        size: Integer, total size of the data to slice into batches.
+        batch_size: Integer, batch size.
+
+    # Returns
+        A list of tuples of array indices.
+    """
+    num_batches = int(np.ceil(size / float(batch_size)))
+    return [(i * batch_size, min(size, (i + 1) * batch_size))
+            for i in range(0, num_batches)]
+
+
 # 1.load data(X:list of lint,y:int). 2.create session. 3.feed data. 4.training (5.validation) ,(6.prediction)
 def main(_):
     # 1.load data(X:list of lint,y:int).
@@ -65,7 +81,8 @@ def main(_):
         #     FLAGS.traning_data_path = 'training-data/train-zhihu6-title-desc.txt'
         train, test, _ = load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
                                                   multi_label_flag=FLAGS.multi_label_flag,
-                                                  traning_data_path=FLAGS.traning_data_path)  # ,traning_data_path=FLAGS.traning_data_path
+                                                  traning_data_path=FLAGS.traning_data_path,
+                                                  transform=False)  # ,traning_data_path=FLAGS.traning_data_path
         trainX, trainY = train
         testX, testY = test
 
@@ -109,15 +126,26 @@ def main(_):
         batch_size = FLAGS.batch_size
         for epoch in range(curr_epoch, FLAGS.num_epochs):
             loss, acc, counter = 0.0, 0.0, 0
-            for start, end in zip(range(0, number_of_training_data, batch_size),
-                                  range(batch_size, number_of_training_data, batch_size)):
-                if epoch == 0 and counter == 0:
-                    print("trainX[start:end]:", trainX[start:end])  # ;print("trainY[start:end]:",trainY[start:end])
-                feed_dict = {textCNN.input_x: trainX[start:end], textCNN.dropout_keep_prob: 0.5}
+
+            index_array = np.arange(number_of_training_data)
+            np.random.shuffle(index_array)
+
+            batch = make_batches(number_of_training_data, batch_size)
+
+            for start, end in batch:
+                # shuffle
+                batch_ids = index_array[start: end]
+
+                # if epoch == 0 and counter == 0:
+                #     print("trainX[start:end]:", trainX[start:end])  # ;print("trainY[start:end]:",trainY[start:end])
+                feed_dict = {textCNN.input_x: trainX[batch_ids], textCNN.dropout_keep_prob: 0.5}
+
+                train_y = [transform_multilabel_as_multihot(y) for y in trainY[batch_ids]]
                 if not FLAGS.multi_label_flag:
-                    feed_dict[textCNN.input_y] = trainY[start:end]
+                    feed_dict[textCNN.input_y] = train_y
                 else:
-                    feed_dict[textCNN.input_y_multilabel] = trainY[start:end]
+                    feed_dict[textCNN.input_y_multilabel] = train_y
+
                 curr_loss, curr_acc, _ = sess.run([textCNN.loss_val, textCNN.accuracy, textCNN.train_op],
                                                   feed_dict)  # curr_acc--->TextCNN.accuracy
                 loss, counter, acc = loss + curr_loss, counter + 1, acc + curr_acc
@@ -183,10 +211,11 @@ def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
     for start, end in zip(range(0, number_examples, batch_size), range(batch_size, number_examples, batch_size)):
         feed_dict = {textCNN.input_x: evalX[start:end], textCNN.dropout_keep_prob: 1}
+        eval_y = [transform_multilabel_as_multihot(y) for y in evalY[start:end]]
         if not FLAGS.multi_label_flag:
-            feed_dict[textCNN.input_y] = evalY[start:end]
+            feed_dict[textCNN.input_y] = eval_y
         else:
-            feed_dict[textCNN.input_y_multilabel] = evalY[start:end]
+            feed_dict[textCNN.input_y_multilabel] = eval_y
         curr_eval_loss, logits, curr_eval_acc = sess.run([textCNN.loss_val, textCNN.logits, textCNN.accuracy],
                                                          feed_dict)  # curr_eval_acc--->textCNN.accuracy
         # label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)
