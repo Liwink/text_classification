@@ -13,6 +13,7 @@ from data_util_zhihu import load_data_multilabel_new, create_voabulary, \
 from tflearn.data_utils import to_categorical, pad_sequences
 import os
 import word2vec
+from evaluate import evaluate
 import pickle
 
 # fixme
@@ -160,11 +161,12 @@ def main(_):
             # 4.validation
             print(epoch, FLAGS.validate_every, (epoch % FLAGS.validate_every == 0))
             if epoch % FLAGS.validate_every == 0:
+                save_path = FLAGS.ckpt_dir + "model.ckpt"
+                saver.save(sess, save_path, global_step=epoch)
                 eval_loss, eval_acc = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
                 print("Epoch %d Validation Loss:%.3f\tValidation Accuracy: %.3f" % (epoch, eval_loss, eval_acc))
                 # save model to checkpoint
-                save_path = FLAGS.ckpt_dir + "model.ckpt"
-                saver.save(sess, save_path, global_step=epoch)
+
 
         # 5.最后在测试集上做测试，并报告测试准确率 Test
         test_loss, test_acc = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
@@ -209,6 +211,7 @@ def assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, te
 def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label):
     number_examples = len(evalX)
     eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
+    logits_list = np.array([])
     for start, end in zip(range(0, number_examples, batch_size), range(batch_size, number_examples, batch_size)):
         feed_dict = {textCNN.input_x: evalX[start:end], textCNN.dropout_keep_prob: 1}
         eval_y = [transform_multilabel_as_multihot(y) for y in evalY[start:end]]
@@ -218,22 +221,29 @@ def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label
             feed_dict[textCNN.input_y_multilabel] = eval_y
         curr_eval_loss, logits, curr_eval_acc = sess.run([textCNN.loss_val, textCNN.logits, textCNN.accuracy],
                                                          feed_dict)  # curr_eval_acc--->textCNN.accuracy
+        if not len(logits_list):
+            logits_list = logits
+        else:
+            logits_list = np.concatenate((logits_list, logits))
         # label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)
         # curr_eval_acc=calculate_accuracy(list(label_list_top5), evalY[start:end][0],eval_counter)
         eval_loss, eval_acc, eval_counter = eval_loss + curr_eval_loss, eval_acc + curr_eval_acc, eval_counter + 1
+    result = [get_label_using_logits(l, vocabulary_index2word_label) for l in logits_list]
+    y = [[vocabulary_index2word_label[i] for i in item] for item in evalY]
+    print(evaluate(zip(result, y)))
     return eval_loss / float(eval_counter), eval_acc / float(eval_counter)
 
 
 # 从logits中取出前五 get label using logits
-def get_label_using_logits(logits, vocabulary_index2word_label, top_number=1):
-    # print("get_label_using_logits.logits:",logits) #1-d array: array([-5.69036102, -8.54903221, -5.63954401, ..., -5.83969498,-5.84496021, -6.13911009], dtype=float32))
-    index_list = np.argsort(logits)[-top_number:]
+def get_label_using_logits(logits, vocabulary_index2word_label, top_number=5):
+    index_list = np.argsort(logits)[-top_number:]  # print("sum_p", np.sum(1.0 / (1 + np.exp(-logits))))
     index_list = index_list[::-1]
-    # label_list=[]
-    # for index in index_list:
-    #    label=vocabulary_index2word_label[index]
-    #    label_list.append(label) #('get_label_using_logits.label_list:', [u'-3423450385060590478', u'2838091149470021485', u'-3174907002942471215', u'-1812694399780494968', u'6815248286057533876'])
-    return index_list
+    label_list = []
+    for index in index_list:
+        label = vocabulary_index2word_label[index]
+        # ('get_label_using_logits.label_list:', [u'-3423450385060590478', u'2838091149470021485', u'-3174907002942471215', u'-1812694399780494968', u'6815248286057533876'])
+        label_list.append(label)
+    return label_list
 
 
 # 统计预测的准确率
