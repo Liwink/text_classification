@@ -231,6 +231,8 @@ def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label
     result = [get_label_using_logits(l, vocabulary_index2word_label) for l in logits_list]
     y = [[vocabulary_index2word_label[i] for i in item] for item in evalY]
     print(evaluate(zip(result, y)))
+    with open('evaluate.txt', 'a') as f:
+        f.write(str(evaluate(zip(result, y))) + '\n')
     return eval_loss / float(eval_counter), eval_acc / float(eval_counter)
 
 
