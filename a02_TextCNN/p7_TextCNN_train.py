@@ -16,11 +16,12 @@ import word2vec
 from evaluate import evaluate
 import pickle
 
-# fixme
-TEST = False
-
 # configuration
 FLAGS = tf.app.flags.FLAGS
+
+tf.app.flags.DEFINE_integer("test", False, "using small sample")
+TEST = FLAGS.test
+
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
 if not TEST:
@@ -39,8 +40,10 @@ tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every 
 tf.app.flags.DEFINE_boolean("use_embedding", True, "whether to use embedding or not.")
 # tf.app.flags.DEFINE_string("cache_path","text_cnn_checkpoint/data_cache.pik","checkpoint location for the model")
 # train-zhihu4-only-title-all.txt
-tf.app.flags.DEFINE_string("traning_data_path", "train-zhihu4-only-title-all.txt",
-                           "path of traning data.")  # O.K.train-zhihu4-only-title-all.txt-->training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
+# tf.app.flags.DEFINE_string("traning_data_path", "train-zhihu4-only-title-all.txt",
+#                            "path of traning data.")  # O.K.train-zhihu4-only-title-all.txt-->training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
+tf.app.flags.DEFINE_string("traning_data_path", "train-zhihu6-title-desc.txt",
+                           "path of traning data.")
 tf.app.flags.DEFINE_integer("num_filters", 256, "number of filters")  # 256--->512
 tf.app.flags.DEFINE_string("word2vec_model_path", "zhihu-word2vec-title-desc.bin-100",
                            "word2vec's vocabulary and vectors")  # zhihu-word2vec.bin-100-->zhihu-word2vec-multilabel-minicount15.bin-100
@@ -79,7 +82,7 @@ def main(_):
         print("cnn_model.vocab_size:", vocab_size)
         vocabulary_word2index_label, vocabulary_index2word_label = create_voabulary_label(name_scope="cnn2")
         # if FLAGS.multi_label_flag:
-        #     FLAGS.traning_data_path = 'training-data/train-zhihu6-title-desc.txt'
+        #     FLAGS.traning_data_path = 'train-zhihu6-title-desc.txt'
         train, test, _ = load_data_multilabel_new(vocabulary_word2index, vocabulary_word2index_label,
                                                   multi_label_flag=FLAGS.multi_label_flag,
                                                   traning_data_path=FLAGS.traning_data_path,

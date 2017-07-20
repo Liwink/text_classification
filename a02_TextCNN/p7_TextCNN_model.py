@@ -158,7 +158,7 @@ class TextCNN:
             # let `x = logits`, `z = labels`.
             # The logistic loss is:z * -log(sigmoid(x)) + (1 - z) * -log(1 - sigmoid(x))
             losses = tf.nn.sigmoid_cross_entropy_with_logits(labels=self.input_y_multilabel,
-                                                             logits=self.logits);  # losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.input__y,logits=self.logits)
+                                                             logits=self.logits)  # losses=tf.nn.softmax_cross_entropy_with_logits(labels=self.input__y,logits=self.logits)
             # losses=-self.input_y_multilabel*tf.log(self.logits)-(1-self.input_y_multilabel)*tf.log(1-self.logits)
             print("sigmoid_cross_entropy_with_logits.losses:", losses)  # shape=(?, 1999).
             losses = tf.reduce_sum(losses, axis=1)  # shape=(?,). loss for all data in the batch
