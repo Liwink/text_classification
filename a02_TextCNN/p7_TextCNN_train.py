@@ -24,6 +24,7 @@ TEST = FLAGS.test
 
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
+tf.app.flags.DEFINE_float("multiply_lr", 1, "muliply learning rate")
 if not TEST:
     tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 else:
@@ -125,6 +126,10 @@ def main(_):
                 assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, textCNN,
                                                  word2vec_model_path=FLAGS.word2vec_model_path)
         curr_epoch = sess.run(textCNN.epoch_step)
+        print('pre learning rate: ', sess.run(textCNN.learning_rate))
+        inc_lr = tf.assign(textCNN.learning_rate,
+                           tf.multiply(textCNN.learning_rate, tf.constant(FLAGS.multiply_lr)))
+        print('curr learning rate: ', sess.run(inc_lr))
         # 3.feed data & training
         number_of_training_data = len(trainX)
         batch_size = FLAGS.batch_size
