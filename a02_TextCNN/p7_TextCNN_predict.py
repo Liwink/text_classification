@@ -20,7 +20,7 @@ tf.app.flags.DEFINE_integer("scope", 'default', "name scope")
 
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 1024, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+tf.app.flags.DEFINE_integer("batch_size", 1024*16, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.")  # 0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir", "text_cnn_title_desc_checkpoint/", "checkpoint location for the model")
