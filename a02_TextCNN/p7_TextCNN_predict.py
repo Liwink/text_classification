@@ -16,11 +16,11 @@ from p7_TextCNN_model import TextCNN
 
 # configuration
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_integer("scope", 'default', "name scope")
+tf.app.flags.DEFINE_string("scope", 'default', "name scope")
 
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 1024*16, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+tf.app.flags.DEFINE_integer("batch_size", 1024, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.")  # 0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir", "text_cnn_title_desc_checkpoint/", "checkpoint location for the model")
@@ -106,6 +106,21 @@ def get_logits_with_value_by_input(start, end):
     return predicted_labels, p_labels
 
 
+def make_batches(size, batch_size):
+    """Returns a list of batch indices (tuples of indices).
+
+    # Arguments
+        size: Integer, total size of the data to slice into batches.
+        batch_size: Integer, batch size.
+
+    # Returns
+        A list of tuples of array indices.
+    """
+    num_batches = int(np.ceil(size / float(batch_size)))
+    return [(i * batch_size, min(size, (i + 1) * batch_size))
+            for i in range(0, num_batches)]
+
+
 def main(_):
     # 1.load data with vocabulary of words and labels
     vocabulary_word2index, vocabulary_index2word = create_voabulary(simple='simple',
@@ -144,12 +159,11 @@ def main(_):
         number_of_training_data = len(testX2)
         print("number_of_training_data:", number_of_training_data)
 
-        logits_list = None
-        for start, end in zip(range(0, number_of_training_data, FLAGS.batch_size),
-                              range(FLAGS.batch_size, number_of_training_data + 1, FLAGS.batch_size)):
+        logits_list = np.array([])
+        for start, end in make_batches(number_of_training_data, FLAGS.batch_size):
             logits = sess.run(textCNN.logits, feed_dict={textCNN.input_x: testX2[start:end],
                                                          textCNN.dropout_keep_prob: 1})  # 'shape of logits:', ( 1, 1999)
-            if not logits_list:
+            if not len(logits_list):
                 logits_list = logits
             else:
                 logits_list = np.concatenate((logits_list, logits))
