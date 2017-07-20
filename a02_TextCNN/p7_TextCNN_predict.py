@@ -30,7 +30,7 @@ tf.app.flags.DEFINE_boolean("is_training", False, "is traning.true:tranining,fal
 tf.app.flags.DEFINE_integer("num_epochs", 15, "number of epochs.")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.")  # 每10轮做一次验证
 tf.app.flags.DEFINE_string("predict_target_file",
-                           "text_cnn_title_desc_checkpoint/zhihu_result_cnn_multilabel_v6_e14.csv",
+                           "zhihu_result_cnn_multilabel.csv",
                            "target file path for final prediction")
 tf.app.flags.DEFINE_string("predict_source_file", 'test-zhihu-forpredict-title-desc-v6.txt',
                            "target file path for final prediction")  # test-zhihu-forpredict-v4only-title.txt
@@ -190,7 +190,7 @@ def get_label_using_logits_with_value(logits, vocabulary_index2word_label, top_n
 
 # write question id and labels to file system.
 def write_question_id_with_labels(question_id, labels_list):
-    with codecs.open(FLAGS.predict_target_file, 'a', 'utf8') as f:
+    with codecs.open(FLAGS.scope + '_' + FLAGS.predict_target_file, 'a', 'utf8') as f:
         for i in range(len(question_id)):
             labels_string = ",".join(labels_list[i])
             f.write(question_id[i] + "," + labels_string + "\n")
