@@ -13,6 +13,7 @@ from tflearn.data_utils import pad_sequences  # to_categorical
 import os
 import codecs
 from p7_TextCNN_model import TextCNN
+from tqdm import tqdm
 
 # configuration
 FLAGS = tf.app.flags.FLAGS
@@ -160,7 +161,7 @@ def main(_):
         print("number_of_training_data:", number_of_training_data)
 
         logits_list = np.array([])
-        for start, end in make_batches(number_of_training_data, FLAGS.batch_size):
+        for start, end in tqdm(make_batches(number_of_training_data, FLAGS.batch_size)):
             logits = sess.run(textCNN.logits, feed_dict={textCNN.input_x: testX2[start:end],
                                                          textCNN.dropout_keep_prob: 1})  # 'shape of logits:', ( 1, 1999)
             if not len(logits_list):
@@ -175,7 +176,7 @@ def main(_):
         write_question_id_with_labels(question_id_list, predicted_labels)
 
         print('save predict detail')
-        np.save(FLAGS.scope + '_prediction_detail', logits)
+        np.save(FLAGS.scope + '_prediction_detail', logits_list)
 
 
 # get label using logits
