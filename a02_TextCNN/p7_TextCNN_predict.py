@@ -16,9 +16,11 @@ from p7_TextCNN_model import TextCNN
 
 # configuration
 FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_integer("scope", 'default', "name scope")
+
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 1, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
+tf.app.flags.DEFINE_integer("batch_size", 1024, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 5000, "how many steps before decay learning rate.")  # 批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.")  # 0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir", "text_cnn_title_desc_checkpoint/", "checkpoint location for the model")
@@ -139,20 +141,27 @@ def main(_):
             print("Can't find the checkpoint.going to stop")
             return
         # 5.feed data, to get logits
-        number_of_training_data = len(testX2);
+        number_of_training_data = len(testX2)
         print("number_of_training_data:", number_of_training_data)
-        index = 0
-        predict_target_file_f = codecs.open(FLAGS.predict_target_file, 'a', 'utf8')
+
+        logits_list = None
         for start, end in zip(range(0, number_of_training_data, FLAGS.batch_size),
                               range(FLAGS.batch_size, number_of_training_data + 1, FLAGS.batch_size)):
             logits = sess.run(textCNN.logits, feed_dict={textCNN.input_x: testX2[start:end],
                                                          textCNN.dropout_keep_prob: 1})  # 'shape of logits:', ( 1, 1999)
-            # 6. get lable using logtis
-            predicted_labels = get_label_using_logits(logits[0], vocabulary_index2word_label)
-            # 7. write question id and labels to file system.
-            write_question_id_with_labels(question_id_list[index], predicted_labels, predict_target_file_f)
-            index = index + 1
-        predict_target_file_f.close()
+            if not logits_list:
+                logits_list = logits
+            else:
+                logits_list = np.concatenate((logits_list, logits))
+
+        # 6. get lable using logtis
+        predicted_labels = [get_label_using_logits(l, vocabulary_index2word_label) for l in logits_list]
+
+        # 7. write question id and labels to file system.
+        write_question_id_with_labels(question_id_list, predicted_labels)
+
+        print('save predict detail')
+        np.save(FLAGS.scope + '_prediction_detail', logits)
 
 
 # get label using logits
@@ -162,7 +171,6 @@ def get_label_using_logits(logits, vocabulary_index2word_label, top_number=5):
     label_list = []
     for index in index_list:
         label = vocabulary_index2word_label[index]
-        # ('get_label_using_logits.label_list:', [u'-3423450385060590478', u'2838091149470021485', u'-3174907002942471215', u'-1812694399780494968', u'6815248286057533876'])
         label_list.append(label)
     return label_list
 
@@ -175,20 +183,21 @@ def get_label_using_logits_with_value(logits, vocabulary_index2word_label, top_n
     label_list = []
     for index in index_list:
         label = vocabulary_index2word_label[index]
-        # ('get_label_using_logits.label_list:', [u'-3423450385060590478', u'2838091149470021485', u'-3174907002942471215', u'-1812694399780494968', u'6815248286057533876'])
         label_list.append(label)
         value_list.append(logits[index])
     return label_list, value_list
 
 
 # write question id and labels to file system.
-def write_question_id_with_labels(question_id, labels_list, f):
-    labels_string = ",".join(labels_list)
-    f.write(question_id + "," + labels_string + "\n")
+def write_question_id_with_labels(question_id, labels_list):
+    with codecs.open(FLAGS.predict_target_file, 'a', 'utf8') as f:
+        for i in range(len(question_id)):
+            labels_string = ",".join(labels_list[i])
+            f.write(question_id[i] + "," + labels_string + "\n")
 
 
 if __name__ == "__main__":
-    # tf.app.run()
-    labels, list_value = get_logits_with_value_by_input(0, 1)
-    print("labels:", labels)
-    print("list_value:", list_value)
+    tf.app.run()
+    # labels, list_value = get_logits_with_value_by_input(0, 1)
+    # print("labels:", labels)
+    # print("list_value:", list_value)
