@@ -24,7 +24,6 @@ TEST = FLAGS.test
 
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_float("multiply_lr", 1, "muliply learning rate")
 if not TEST:
     tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")  # 批处理的大小 32-->128
 else:
@@ -126,15 +125,19 @@ def main(_):
                 assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, textCNN,
                                                  word2vec_model_path=FLAGS.word2vec_model_path)
         curr_epoch = sess.run(textCNN.epoch_step)
-        print('pre learning rate: ', sess.run(textCNN.learning_rate))
-        inc_lr = tf.assign(textCNN.learning_rate,
-                           tf.multiply(textCNN.learning_rate, tf.constant(FLAGS.multiply_lr)))
-        print('curr learning rate: ', sess.run(inc_lr))
+
+        # lr = sess.run(textCNN.learning_rate)
+        graph = tf.get_default_graph()
+        lr = graph.get_tensor_by_name('ExponentialDecay:0')
+        print('pre learning rate: ', sess.run(lr))
+        textCNN.reset_learning_rate(FLAGS.learning_rate)
+        print('curr learning rate: ', sess.run(textCNN.learning_rate))
+
         # 3.feed data & training
         number_of_training_data = len(trainX)
         batch_size = FLAGS.batch_size
         for epoch in range(curr_epoch, FLAGS.num_epochs):
-            loss, acc, counter = 0.0, 0.0, 0
+            loss, counter = 0.0, 0
 
             index_array = np.arange(number_of_training_data)
             np.random.shuffle(index_array)
@@ -155,12 +158,12 @@ def main(_):
                 else:
                     feed_dict[textCNN.input_y_multilabel] = train_y
 
-                curr_loss, curr_acc, _ = sess.run([textCNN.loss_val, textCNN.accuracy, textCNN.train_op],
+                curr_loss, _ = sess.run([textCNN.loss_val, textCNN.train_op],
                                                   feed_dict)  # curr_acc--->TextCNN.accuracy
-                loss, counter, acc = loss + curr_loss, counter + 1, acc + curr_acc
+                loss, counter = loss + curr_loss, counter + 1
                 if counter % 50 == 0:
-                    print("Epoch %d\tBatch %d\tTrain Loss:%.3f\tTrain Accuracy:%.3f" % (
-                    epoch, counter, loss / float(counter), acc / float(counter)))
+                    print("Epoch %d\tBatch %d\tTrain Loss:%.3f" % (
+                    epoch, counter, loss / float(counter)))
 
             # epoch increment
             print("going to increment epoch counter....")
@@ -171,13 +174,15 @@ def main(_):
             if epoch % FLAGS.validate_every == 0:
                 save_path = FLAGS.ckpt_dir + "model.ckpt"
                 saver.save(sess, save_path, global_step=epoch)
-                eval_loss, eval_acc = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
-                print("Epoch %d Validation Loss:%.3f\tValidation Accuracy: %.3f" % (epoch, eval_loss, eval_acc))
+                eval_loss = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
+                print("Epoch %d Validation Loss:%.3f" % (epoch, eval_loss))
                 # save model to checkpoint
 
-
+            print('global step: {}'.format(sess.run(textCNN.global_step)))
+            print('learning rate: ', sess.run(textCNN.learning_rate))
         # 5.最后在测试集上做测试，并报告测试准确率 Test
-        test_loss, test_acc = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
+        test_loss = do_eval(sess, textCNN, testX, testY, batch_size, vocabulary_index2word_label)
+
     pass
 
 
@@ -218,16 +223,16 @@ def assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, te
 # 在验证集上做验证，报告损失、精确度
 def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label):
     number_examples = len(evalX)
-    eval_loss, eval_acc, eval_counter = 0.0, 0.0, 0
+    eval_loss, eval_counter = 0.0, 0
     logits_list = np.array([])
-    for start, end in zip(range(0, number_examples, batch_size), range(batch_size, number_examples, batch_size)):
+    for start, end in make_batches(number_examples, batch_size):
         feed_dict = {textCNN.input_x: evalX[start:end], textCNN.dropout_keep_prob: 1}
         eval_y = [transform_multilabel_as_multihot(y) for y in evalY[start:end]]
         if not FLAGS.multi_label_flag:
             feed_dict[textCNN.input_y] = eval_y
         else:
             feed_dict[textCNN.input_y_multilabel] = eval_y
-        curr_eval_loss, logits, curr_eval_acc = sess.run([textCNN.loss_val, textCNN.logits, textCNN.accuracy],
+        curr_eval_loss, logits= sess.run([textCNN.loss_val, textCNN.logits],
                                                          feed_dict)  # curr_eval_acc--->textCNN.accuracy
         if not len(logits_list):
             logits_list = logits
@@ -235,13 +240,13 @@ def do_eval(sess, textCNN, evalX, evalY, batch_size, vocabulary_index2word_label
             logits_list = np.concatenate((logits_list, logits))
         # label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)
         # curr_eval_acc=calculate_accuracy(list(label_list_top5), evalY[start:end][0],eval_counter)
-        eval_loss, eval_acc, eval_counter = eval_loss + curr_eval_loss, eval_acc + curr_eval_acc, eval_counter + 1
+        eval_loss, eval_counter = eval_loss + curr_eval_loss, eval_counter + 1
     result = [get_label_using_logits(l, vocabulary_index2word_label) for l in logits_list]
     y = [[vocabulary_index2word_label[i] for i in item] for item in evalY]
     print(evaluate(zip(result, y)))
     with open('evaluate.txt', 'a') as f:
         f.write(str(evaluate(zip(result, y))) + '\n')
-    return eval_loss / float(eval_counter), eval_acc / float(eval_counter)
+    return eval_loss / float(eval_counter)
 
 
 # 从logits中取出前五 get label using logits
