@@ -27,4 +27,7 @@ def evaluate(predict_label_and_marked_label_list):
         precision += ((right_num / float(sample_num))) / math.log(2.0 + pos)
     recall = float(right_label_num) / all_marked_label_num
 
+    if not (precision + recall):
+        return 0
+
     return (precision * recall) / (precision + recall), precision, recall, right_label_num, all_marked_label_num
