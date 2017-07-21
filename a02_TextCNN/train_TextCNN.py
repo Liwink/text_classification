@@ -3,7 +3,8 @@ import numpy as np
 import os
 import word2vec
 
-from model_TextCNN import TextCNN
+# from model_TextCNN import TextCNN
+from p7_TextCNN_model import TextCNN
 from tflearn.data_utils import pad_sequences
 from evaluate import evaluate
 from tqdm import tqdm
@@ -14,7 +15,7 @@ FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_integer("num_classes", 1999, "number of label")
 tf.app.flags.DEFINE_float("learning_rate", 0.01, "learning rate")
-tf.app.flags.DEFINE_float("multiply_lr", 1, "muliply learning rate")
+tf.app.flags.DEFINE_float("multiply_lr", 1.0, "muliply learning rate")
 # tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.")
 tf.app.flags.DEFINE_integer("batch_size", 32, "Batch size for training/evaluating.")
 tf.app.flags.DEFINE_integer("decay_steps", 6000, "how many steps before decay learning rate.")
@@ -174,9 +175,9 @@ def main(_):
         # get current epoch
         curr_epoch = sess.run(textcnn.epoch_step)
         print('pre learning rate: ', sess.run(textcnn.learning_rate))
-        inc_lr = tf.assign(textcnn.learning_rate,
-                           tf.multiply(textcnn.learning_rate, tf.constant(FLAGS.multiply_lr)))
-        print('curr learning rate: ', sess.run(inc_lr))
+        # inc_lr = tf.assign(textcnn.learning_rate,
+        #                    tf.multiply(textcnn.learning_rate, tf.constant(FLAGS.multiply_lr)))
+        # print('curr learning rate: ', sess.run(inc_lr))
 
         # Feed Data & Training
         batch_size = FLAGS.batch_size
