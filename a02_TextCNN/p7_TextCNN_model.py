@@ -17,9 +17,9 @@ class TextCNN:
         self.vocab_size = vocab_size
         self.embed_size = embed_size
         self.is_training = is_training
-        self.learning_rate = tf.Variable(learning_rate, trainable=False, name="learning_rate")  # ADD learning_rate
-        self.learning_rate_decay_half_op = tf.assign(self.learning_rate, self.learning_rate * decay_rate_big)
-        self.filter_sizes = filter_sizes  # it is a list of int. e.g. [3,4,5]
+        self.learning_rate = tf.Variable(learning_rate, trainable=False, name="learning_rate")
+        self.decay_lr = None
+        self.filter_sizes = filter_sizes
         self.num_filters = num_filters
         self.initializer = initializer
         self.num_filters_total = self.num_filters * len(filter_sizes)  # how many filters totally.
@@ -48,7 +48,7 @@ class TextCNN:
 
         self.logits = self.inference()
         self.loss_val = self.loss_multi_label()
-        self.train_op = self.train
+        self.train_op = self.train()
         self.predictions = tf.argmax(self.logits, 1, name="predictions")
 
     def inference(self):
@@ -110,7 +110,7 @@ class TextCNN:
 
     def train(self):
         """based on the loss, use SGD to update parameter"""
-        self.learning_rate = tf.train.exponential_decay(
+        self.decay_lr = tf.train.exponential_decay(
             self.learning_rate,
             self.global_step,
             self.decay_steps,
@@ -120,24 +120,9 @@ class TextCNN:
         train_op = tf.contrib.layers.optimize_loss(
             self.loss_val,
             global_step=self.global_step,
-            learning_rate=self.learning_rate,
+            learning_rate=self.decay_lr,
             optimizer="Adam",
             clip_gradients=self.clip_gradients
         )
         return train_op
 
-    def reset_learning_rate(self, lr):
-        self.learning_rate = tf.train.exponential_decay(
-            lr,
-            self.global_step,
-            self.decay_steps,
-            self.decay_rate,
-            staircase=True
-        )
-        self.train_op = tf.contrib.layers.optimize_loss(
-            self.loss_val,
-            global_step=self.global_step,
-            learning_rate=self.learning_rate,
-            optimizer="Adam",
-            clip_gradients=self.clip_gradients
-        )

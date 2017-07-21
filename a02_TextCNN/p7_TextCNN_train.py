@@ -126,12 +126,9 @@ def main(_):
                                                  word2vec_model_path=FLAGS.word2vec_model_path)
         curr_epoch = sess.run(textCNN.epoch_step)
 
-        # lr = sess.run(textCNN.learning_rate)
-        graph = tf.get_default_graph()
-        lr = graph.get_tensor_by_name('ExponentialDecay:0')
-        print('pre learning rate: ', sess.run(lr))
-        textCNN.reset_learning_rate(FLAGS.learning_rate)
+        sess.run(tf.assign(textCNN.learning_rate, tf.constant(FLAGS.learning_rate)))
         print('curr learning rate: ', sess.run(textCNN.learning_rate))
+        import pdb; pdb.set_trace()
 
         # 3.feed data & training
         number_of_training_data = len(trainX)
